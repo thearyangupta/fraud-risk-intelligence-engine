@@ -1,1 +1,1 @@
-# fraud-risk-intelligence-engine
+A transaction risk & fraud scoring engine. Classical ML, built to learn data/ML fundamentals.
