@@ -64,3 +64,9 @@ The costs of false positives and false negatives are not equal. The eventual dec
 ## Point-in-Time Rule
 
 **Features may only use information available strictly before the transaction timestamp.**
+
+## Customer overlap across temporal splits
+
+The same customer may appear across train, validation, and test because the production setting includes returning customers whose historical transactions are available before a future transaction is scored.
+
+This overlap is therefore acceptable for the temporal evaluation setup. However, raw customer identity should not be treated as a shortcut for prediction; behavioural features must respect prediction-time availability and use only information available before the current transaction.
