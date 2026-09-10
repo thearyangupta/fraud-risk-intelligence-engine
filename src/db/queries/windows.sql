@@ -1,17 +1,38 @@
--- These queries demonstrate LAG and ROW_NUMBER.
+-- Verified temporal SQL queries.
 
--- 1. Previous transaction amount and timestamp for each customer.
+
+-- ============================================================
+-- Signal 1: Previous transaction amount
+-- Fraud signal: compare the current amount with the customer's
+-- immediately previous transaction.
+-- ============================================================
+
 SELECT
     transaction_id,
     customer_id,
     timestamp,
     amount,
-    split,
 
     LAG(amount) OVER (
         PARTITION BY customer_id
         ORDER BY timestamp
-    ) AS previous_amount,
+    ) AS previous_amount
+
+FROM transactions
+ORDER BY customer_id, timestamp;
+
+
+
+-- ============================================================
+-- Signal 2: Previous transaction timestamp
+-- Fraud signal: supports calculating time since the customer's
+-- previous transaction.
+-- ============================================================
+
+SELECT
+    transaction_id,
+    customer_id,
+    timestamp,
 
     LAG(timestamp) OVER (
         PARTITION BY customer_id
@@ -22,13 +43,17 @@ FROM transactions
 ORDER BY customer_id, timestamp;
 
 
--- 2. Chronological transaction sequence for each customer.
+
+-- ============================================================
+-- Signal 3: Transaction sequence number
+-- Fraud signal: identifies whether this is the customer's first
+-- observed transaction or a later transaction.
+-- ============================================================
+
 SELECT
     transaction_id,
     customer_id,
     timestamp,
-    amount,
-    split,
 
     ROW_NUMBER() OVER (
         PARTITION BY customer_id
@@ -39,39 +64,17 @@ FROM transactions
 ORDER BY customer_id, timestamp;
 
 
--- 3. Combined Day 3 window query.
-SELECT
-    transaction_id,
-    customer_id,
-    timestamp,
-    amount,
-    split,
 
-    LAG(amount) OVER (
-        PARTITION BY customer_id
-        ORDER BY timestamp
-    ) AS previous_amount,
-
-    LAG(timestamp) OVER (
-        PARTITION BY customer_id
-        ORDER BY timestamp
-    ) AS previous_timestamp,
-
-    ROW_NUMBER() OVER (
-        PARTITION BY customer_id
-        ORDER BY timestamp
-    ) AS transaction_sequence
-
-FROM transactions
-ORDER BY customer_id, timestamp;
-
--- Rolling aggregate practice.
+-- ============================================================
+-- Signal 4: Rolling historical average amount
+-- Fraud signal: compare the current amount against the customer's
+-- previous three transactions.
 --
+-- Important:
 -- The frame ends at 1 PRECEDING so the current transaction
--- is excluded from its own historical calculation.
+-- is excluded from its own historical average.
+-- ============================================================
 
-
--- 4. Average amount over the previous 3 transactions.
 SELECT
     transaction_id,
     customer_id,
@@ -88,35 +91,19 @@ FROM transactions
 ORDER BY customer_id, timestamp;
 
 
--- 5. Count of the previous 3 transactions.
+
+-- ============================================================
+-- Signal 5: Recent transaction count
+-- Fraud signal: measures how many transactions exist in the
+-- previous three observed transactions.
+--
+-- This is a fixed-row window, not a time-based window.
+-- ============================================================
+
 SELECT
     transaction_id,
     customer_id,
     timestamp,
-    amount,
-
-    COUNT(*) OVER (
-        PARTITION BY customer_id
-        ORDER BY timestamp
-        ROWS BETWEEN 3 PRECEDING AND 1 PRECEDING
-    ) AS previous_3_transaction_count
-
-FROM transactions
-ORDER BY customer_id, timestamp;
-
-
--- 6. Combined rolling-window query.
-SELECT
-    transaction_id,
-    customer_id,
-    timestamp,
-    amount,
-
-    AVG(amount) OVER (
-        PARTITION BY customer_id
-        ORDER BY timestamp
-        ROWS BETWEEN 3 PRECEDING AND 1 PRECEDING
-    ) AS previous_3_avg_amount,
 
     COUNT(*) OVER (
         PARTITION BY customer_id

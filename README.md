@@ -43,3 +43,39 @@ Completed work:
 The split is ordered by time rather than randomly because the production problem is inherently temporal: the system must use information available in the past to score future transactions. A random split could allow later transactions to influence training while earlier transactions appear in evaluation, producing an unrealistically optimistic result.
 
 No machine-learning model has been trained yet. The project is still focused on building a point-in-time-correct, reproducible foundation for later feature engineering and modeling.
+
+
+## PostgreSQL & Temporal SQL
+
+This week focused on moving the transaction dataset into PostgreSQL and learning temporal SQL window functions while preserving the temporal train/validation/test boundaries created in Week 2.
+
+### Completed work
+
+* Designed a PostgreSQL schema with `customers` and `transactions` tables.
+* Preserved the temporal `train`, `val`, and `test` split inside the database using a `split` column.
+* Added an index on `(customer_id, timestamp)` for customer-history queries.
+* Loaded the full transaction dataset into PostgreSQL.
+* Verified row counts, timestamps, required null checks, and customer transaction aggregation.
+* Practised SQL window functions using real transaction histories.
+* Hand-verified temporal query outputs against one customer's ordered transactions.
+
+### Temporal signals I can now compute
+
+* Previous transaction amount using `LAG(amount)`.
+* Previous transaction timestamp using `LAG(timestamp)`.
+* Transaction sequence number using `ROW_NUMBER()`.
+* Historical rolling average amount over previous transactions.
+* Historical recent transaction count over a fixed row window.
+
+### Important temporal boundary
+
+A key lesson from this week is that a historical SQL window must stop **before the current transaction** when calculating past behaviour.
+
+For example:
+
+* `ROWS BETWEEN 3 PRECEDING AND CURRENT ROW` includes the current transaction.
+* `ROWS BETWEEN 3 PRECEDING AND 1 PRECEDING` excludes the current transaction and represents only prior history.
+
+
+
+No machine-learning model has been trained yet, and no LLM has been used. The project remains focused on building a correct temporal data foundation before modeling.
