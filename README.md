@@ -79,3 +79,59 @@ For example:
 
 
 No machine-learning model has been trained yet, and no LLM has been used. The project remains focused on building a correct temporal data foundation before modeling.
+
+
+## Point-in-Time Feature Engineering
+
+Built a production-style behavioral feature engineering pipeline with strict temporal correctness.
+
+### Feature Families
+
+**Velocity Features**
+- Previous 10-minute transaction count
+- Previous 1-hour transaction count
+- Previous 24-hour transaction count
+- Seconds since previous transaction
+
+**Amount-Deviation Features**
+- Prior transaction count
+- Prior historical average amount
+- Prior historical standard deviation
+- Current amount / prior average ratio
+- Z-score versus prior spending behavior
+- Explicit insufficient-history handling
+
+**Novelty Features**
+- New merchant flag
+- New category flag
+
+### Temporal Leakage Protection
+
+All historical features are computed using only information available **before** the current transaction.
+
+Implemented protections include:
+
+- chronological customer ordering
+- historical window calculations
+- current transaction exclusion
+- split-local feature generation
+- automated leakage regression tests
+
+### Engineering Structure
+
+```text
+build_features()
+    ├── velocity
+    ├── amount deviation
+    └── novelty
+```
+
+The feature builder produces one feature table per temporal split (`train`, `val`, `test`) while preserving point-in-time correctness.
+
+### Testing
+
+- 13 automated pytest tests
+- Temporal split validation
+- Data validation
+- Point-in-time leakage guard
+- Ruff static analysis

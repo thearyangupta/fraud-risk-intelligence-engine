@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 
-
 VELOCITY_WINDOWS = {
     "txn_count_10m_before": pd.Timedelta(minutes=10),
     "txn_count_1h_before": pd.Timedelta(hours=1),
