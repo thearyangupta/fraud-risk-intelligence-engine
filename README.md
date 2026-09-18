@@ -135,3 +135,54 @@ The feature builder produces one feature table per temporal split (`train`, `val
 - Data validation
 - Point-in-time leakage guard
 - Ruff static analysis
+
+
+## Rule-Based Fraud Baseline
+
+Built the project's first deliberately simple fraud detector using point-in-time features
+
+### v1 Rules
+
+A transaction is flagged when:
+
+- its amount is more than 5x the customer's prior average and the merchant is new, or
+- more than 3 prior transactions occurred within the previous hour.
+
+Thresholds were checked using a few sensible validation-only passes rather than exhaustive optimization. The test split remained untouched.
+
+### Validation Metrics
+
+| Metric | v1 |
+|---|---:|
+| Precision | 0.1357 |
+| Recall | 0.4137 |
+| F1 | 0.2044 |
+| Accuracy | 0.9793 |
+
+Accuracy is included to demonstrate the class-imbalance problem rather than as the primary model-selection metric.
+
+The v1 confusion matrix contains 518 true positives, 3,299 false positives, 189,950 true negatives, and 734 false negatives.
+
+### Model Versioning
+
+Model experiment tracking begins with `v1`.
+
+`metrics.csv` records:
+
+- model version
+- model type
+- features used
+- precision
+- recall
+- F1
+- experiment notes
+
+The lightweight metrics log provides a baseline against which later models can be compared.
+
+### Error Costs
+
+False positives create legitimate-customer and operational friction, while false negatives allow fraud to pass undetected.
+
+For this project, false negatives are treated as having a higher direct per-event cost, while recognizing that false positives can also become expensive at scale.
+
+This cost asymmetry will later inform decision thresholds and the allow / review / block policy.
