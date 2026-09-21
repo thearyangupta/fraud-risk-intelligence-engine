@@ -3,7 +3,6 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-
 FEATURE_COLUMNS = [
     "txn_count_10m_before",
     "txn_count_1h_before",
@@ -40,6 +39,37 @@ def prepare_model_inputs(
     return inputs
 
 
+def oversample_minority_class(
+    train_features: pd.DataFrame,
+    label_col: str = "is_fraud",
+    random_state: int = 42,
+) -> pd.DataFrame:
+    majority = train_features[
+        train_features[label_col] == 0
+    ]
+
+    minority = train_features[
+        train_features[label_col] == 1
+    ]
+
+    minority_oversampled = minority.sample(
+        n=len(majority),
+        replace=True,
+        random_state=random_state,
+    )
+
+    balanced = pd.concat(
+        [majority, minority_oversampled],
+        ignore_index=True,
+    )
+
+    balanced = balanced.sample(
+        frac=1.0,
+        random_state=random_state,
+    ).reset_index(drop=True)
+
+    return balanced
+
 def train_class_weighted_logistic_regression(
     train_features: pd.DataFrame,
 ) -> Pipeline:
@@ -53,6 +83,33 @@ def train_class_weighted_logistic_regression(
                 "classifier",
                 LogisticRegression(
                     class_weight="balanced",
+                    max_iter=1000,
+                ),
+            ),
+        ]
+    )
+
+    model.fit(X_train, y_train)
+
+    return model
+
+
+def train_oversampled_logistic_regression(
+    train_features: pd.DataFrame,
+) -> Pipeline:
+    resampled_train = oversample_minority_class(
+        train_features
+    )
+
+    X_train = prepare_model_inputs(resampled_train)
+    y_train = resampled_train["is_fraud"]
+
+    model = Pipeline(
+        steps=[
+            ("scaler", StandardScaler()),
+            (
+                "classifier",
+                LogisticRegression(
                     max_iter=1000,
                 ),
             ),
