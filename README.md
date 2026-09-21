@@ -186,3 +186,28 @@ False positives create legitimate-customer and operational friction, while false
 For this project, false negatives are treated as having a higher direct per-event cost, while recognizing that false positives can also become expensive at scale.
 
 This cost asymmetry will later inform decision thresholds and the allow / review / block policy.
+
+
+## Logistic Regression v2
+
+The first learned ML baseline uses logistic regression on the point-in-time behavioral features developed in Week 4.
+
+Two class-imbalance strategies were tested: balanced class weighting and random minority oversampling. Their validation probability distributions were nearly identical, so class weighting was selected because it avoids duplicating observations and substantially increasing the effective training dataset.
+
+Validation results at a 0.5 decision threshold:
+
+| Metric | v1 Rules | v2 Logistic Regression |
+|---|---:|---:|
+| Precision | 0.1357 | 0.0406 |
+| Recall | 0.4137 | 0.8786 |
+| F1 | 0.2044 | 0.0776 |
+| ROC-AUC | — | 0.9161 |
+| PR-AUC / AP | — | 0.1611 |
+
+v2 substantially improves recall at the default threshold, but precision and F1 are lower than the v1 rule baseline. The result demonstrates that model ranking quality and the final operating threshold are separate concerns.
+
+The strongest positive standardized coefficient was `amount_to_prior_avg_ratio`, while `txn_count_1h_before` also contributed positively.
+
+The next modeling lever to investigate is decision-threshold tuning.
+
+See `v2-writeup.md` for the full v2 analysis.
