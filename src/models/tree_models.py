@@ -1,6 +1,7 @@
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
+
 from src.models.logistic_regression import (
     prepare_model_inputs,
 )
