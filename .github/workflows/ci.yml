@@ -19,10 +19,11 @@ jobs:
       - name: Install CI dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas scikit-learn pytest ruff
+          pip install pandas scikit-learn xgboost pytest ruff
 
       - name: Verify ML imports
-        run: python -c "from src.models.logistic_regression import train_class_weighted_logistic_regression"
+        run: |
+          python -c "from src.models.logistic_regression import train_class_weighted_logistic_regression; from src.models.tree_models import train_random_forest, train_gradient_boosting"
 
       - name: Run tests
         run: python -m pytest tests -v

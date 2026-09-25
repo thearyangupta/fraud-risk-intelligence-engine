@@ -211,3 +211,59 @@ The strongest positive standardized coefficient was `amount_to_prior_avg_ratio`,
 The next modeling lever to investigate is decision-threshold tuning.
 
 See `v2-writeup.md` for the full v2 analysis.
+
+
+## Model Evolution
+
+The fraud-risk engine has progressed through three model versions. Model development and selection use the validation split; the final test split remains untouched during model selection.
+
+| Version | Model | Precision | Recall | F1 | ROC-AUC | PR-AUC |
+|---|---|---:|---:|---:|---:|---:|
+| v1 | Rule Baseline | 0.1357 | 0.4137 | 0.2044 | — | — |
+| v2 | Logistic Regression | 0.0406 | 0.8786 | 0.0776 | 0.9161 | 0.1611 |
+| v3 | Gradient Boosting / XGBoost | 0.0513 | 0.9305 | 0.0972 | 0.9721 | 0.5173 |
+
+### Model Selection
+
+Random Forest and Gradient Boosting were compared against the v2 logistic-regression model using the same validation split.
+
+Random Forest produced substantially higher precision and F1 at the default 0.5 threshold:
+
+- Precision: 0.3477
+- Recall: 0.5855
+- F1: 0.4363
+- ROC-AUC: 0.9633
+- PR-AUC: 0.4136
+
+Gradient Boosting produced:
+
+- Precision: 0.0513
+- Recall: 0.9305
+- F1: 0.0972
+- ROC-AUC: 0.9721
+- PR-AUC: 0.5173
+
+Gradient Boosting was selected as the v3 candidate because it produced the strongest validation PR-AUC and ROC-AUC and the highest recall among the compared learned models.
+
+Random Forest demonstrated a different operating trade-off, with substantially stronger precision and F1 at the default 0.5 threshold.
+
+Because precision, recall, and F1 depend on the classification threshold, performance at 0.5 is treated as one operating point rather than a complete measure of model ranking quality.
+
+The final test set remains sealed during model development and selection.
+
+### Feature-Importance Findings
+
+The selected v3 model primarily relies on customer-relative amount behavior.
+
+The four highest-ranked features were:
+
+1. `amount_to_prior_avg_ratio` — 0.3721
+2. `prior_avg_amount` — 0.1735
+3. `amount_zscore_vs_prior` — 0.1390
+4. `seconds_since_prev_txn` — 0.0794
+
+The results strongly support the original amount-deviation hypothesis and also provide evidence for transaction velocity.
+
+Merchant and category novelty contributed substantially less than initially hypothesized.
+
+No obvious new leakage warning was identified from the feature-importance review. Point-in-time leakage guards remain part of the project.

@@ -1,2 +1,4 @@
 version,model,features_used,precision,recall,f1,notes
-v1,rule_baseline,"amount_to_prior_avg_ratio;is_new_merchant;txn_count_1h_before",0.1357,0.4137,0.2044,"No training; manually defined threshold rules tuned with a few validation passes"v2,logistic_regression,Week 4 behavioral features,0.0406,0.8786,0.0776,class_weight=balanced; StandardScaler; validation threshold=0.5; ROC-AUC=0.9161; PR-AUC/AP=0.1611; recall improved vs v1 while precision and F1 decreased
+v1,rule_baseline,"amount_to_prior_avg_ratio;is_new_merchant;txn_count_1h_before",0.1357,0.4137,0.2044,"No training; manually defined threshold rules tuned with a few validation passes"
+v2,logistic_regression,"Week 4 behavioral features",0.0406,0.8786,0.0776,"class_weight=balanced; StandardScaler; validation threshold=0.5; ROC-AUC=0.9161; PR-AUC/AP=0.1611; recall improved vs v1 while precision and F1 decreased"
+v3,gradient_boosting_xgboost,"Week 4 behavioral features",0.0513,0.9305,0.0972,"validation-selected v3; threshold=0.5; ROC-AUC=0.9721; PR-AUC/AP=0.5173; stronger ranking and recall than v2; random forest had higher precision and F1 at threshold 0.5"
