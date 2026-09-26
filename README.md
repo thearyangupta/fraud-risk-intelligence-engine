@@ -1,269 +1,250 @@
 # Fraud Risk Intelligence Engine
 
-A transaction risk & fraud scoring engine. Classical ML, built to learn data/ML fundamentals.
+A transaction risk and fraud-detection engine built around point-in-time behavioral features, temporal evaluation, and multiple classical ML approaches.
 
 ![CI](https://github.com/thearyangupta/fraud-risk-intelligence-engine/actions/workflows/ci.yml/badge.svg)
 
+## Overview
+
+The project explores fraud detection as a temporal, highly imbalanced classification problem.
+
+The pipeline currently covers:
+
+* temporal train/validation/test splitting
+* data validation and leakage protection
+* behavioral feature engineering
+* rule-based and supervised ML baselines
+* tree-based modeling
+* unsupervised anomaly detection
+* model experiment tracking
+* automated testing and CI
+
+The final test split remains untouched during model development and model selection.
+
 ## Data
 
-This project uses a Sparkov-style synthetic credit card transaction dataset.
+The project uses a Sparkov-style synthetic credit-card transaction dataset.
 
-The raw dataset is stored locally under `data/` and is not committed to the repository.
+Raw data is stored locally under `data/` and is not committed to the repository.
 
 Dataset source: https://www.kaggle.com/datasets/kartik2112/fraud-detection/data
 
-## Problem Framing & Dataset Understanding
+## Pipeline
 
-Focused on understanding the fraud-detection problem before building any model.
-
-Completed work:
-
-- Defined what the system is trying to predict and documented the prediction-time information boundary.
-- Evaluated multiple fraud datasets using criteria such as timestamps, account identity, transaction amount, merchant information, labels, size, and license.
-- Selected a Sparkov-style synthetic credit-card transaction dataset because it supports interpretable behavioural analysis using timestamps, account identity, transaction amounts, merchant/category information, and geographic data.
-- Performed an initial exploratory analysis of the dataset, including structure, missing values, class imbalance, transaction-amount distributions, and time-based fraud patterns.
-- Wrote behavioural feature hypotheses covering transaction velocity, amount deviation, unusual timing, new merchant/category behaviour, and geographic anomalies.
-- Reviewed each hypothesis for prediction-time availability to avoid future-information leakage.
-
-No machine-learning model has been trained yet. The focus was problem framing, data understanding, and building a point-in-time-correct foundation for later feature engineering and modeling.
-
-## Splitting, Preprocessing & Validation
-
-It's focused on preventing data leakage and making the data pipeline reproducible and testable before any machine-learning model is introduced.
-
-Completed work:
-
-- Implemented a temporal train/validation/test split so the model will always learn from earlier transactions and be evaluated on later transactions.
-- Kept preprocessing leak-free by fitting categorical preprocessing only on the training split and applying the learned mappings unchanged to validation and test data.
-- Added data-validation checks for schema, value ranges, required null constraints, and fraud-label sanity.
-- Added pytest coverage for both valid and deliberately invalid inputs using small controlled DataFrames.
-- Added a temporal-order test that protects against accidental future-information leakage.
-- Added GitHub Actions CI to run pytest and Ruff automatically on every push.
-
-The split is ordered by time rather than randomly because the production problem is inherently temporal: the system must use information available in the past to score future transactions. A random split could allow later transactions to influence training while earlier transactions appear in evaluation, producing an unrealistically optimistic result.
-
-No machine-learning model has been trained yet. The project is still focused on building a point-in-time-correct, reproducible foundation for later feature engineering and modeling.
-
-
-## PostgreSQL & Temporal SQL
-
-This week focused on moving the transaction dataset into PostgreSQL and learning temporal SQL window functions while preserving the temporal train/validation/test boundaries created in Week 2.
-
-### Completed work
-
-* Designed a PostgreSQL schema with `customers` and `transactions` tables.
-* Preserved the temporal `train`, `val`, and `test` split inside the database using a `split` column.
-* Added an index on `(customer_id, timestamp)` for customer-history queries.
-* Loaded the full transaction dataset into PostgreSQL.
-* Verified row counts, timestamps, required null checks, and customer transaction aggregation.
-* Practised SQL window functions using real transaction histories.
-* Hand-verified temporal query outputs against one customer's ordered transactions.
-
-### Temporal signals I can now compute
-
-* Previous transaction amount using `LAG(amount)`.
-* Previous transaction timestamp using `LAG(timestamp)`.
-* Transaction sequence number using `ROW_NUMBER()`.
-* Historical rolling average amount over previous transactions.
-* Historical recent transaction count over a fixed row window.
-
-### Important temporal boundary
-
-A key lesson from this week is that a historical SQL window must stop **before the current transaction** when calculating past behaviour.
-
-For example:
-
-* `ROWS BETWEEN 3 PRECEDING AND CURRENT ROW` includes the current transaction.
-* `ROWS BETWEEN 3 PRECEDING AND 1 PRECEDING` excludes the current transaction and represents only prior history.
-
-
-
-No machine-learning model has been trained yet, and no LLM has been used. The project remains focused on building a correct temporal data foundation before modeling.
-
+```text
+Raw Transactions
+       |
+       v
+Data Validation
+       |
+       v
+Temporal Train / Validation / Test Split
+       |
+       v
+Point-in-Time Feature Engineering
+       |
+       +----------------------+
+       |                      |
+       v                      v
+Supervised Models       Isolation Forest
+       |                      |
+       +----------+-----------+
+                  |
+                  v
+             Evaluation
+                  |
+                  v
+           Model Versioning
+```
 
 ## Point-in-Time Feature Engineering
 
-Built a production-style behavioral feature engineering pipeline with strict temporal correctness.
+Behavioral features are computed using only information available before the transaction being scored.
 
-### Feature Families
+### Velocity
 
-**Velocity Features**
-- Previous 10-minute transaction count
-- Previous 1-hour transaction count
-- Previous 24-hour transaction count
-- Seconds since previous transaction
+* previous 10-minute transaction count
+* previous 1-hour transaction count
+* previous 24-hour transaction count
+* seconds since previous transaction
 
-**Amount-Deviation Features**
-- Prior transaction count
-- Prior historical average amount
-- Prior historical standard deviation
-- Current amount / prior average ratio
-- Z-score versus prior spending behavior
-- Explicit insufficient-history handling
+### Amount Behavior
 
-**Novelty Features**
-- New merchant flag
-- New category flag
+* prior transaction count
+* prior average amount
+* prior amount standard deviation
+* amount-to-prior-average ratio
+* amount z-score versus prior behavior
+* insufficient-history flag
 
-### Temporal Leakage Protection
+### Novelty
 
-All historical features are computed using only information available **before** the current transaction.
+* new merchant flag
+* new category flag
 
-Implemented protections include:
+Historical windows exclude the current transaction to prevent future-information leakage.
 
-- chronological customer ordering
-- historical window calculations
-- current transaction exclusion
-- split-local feature generation
-- automated leakage regression tests
-
-### Engineering Structure
-
-```text
-build_features()
-    ├── velocity
-    ├── amount deviation
-    └── novelty
-```
-
-The feature builder produces one feature table per temporal split (`train`, `val`, `test`) while preserving point-in-time correctness.
-
-### Testing
-
-- 13 automated pytest tests
-- Temporal split validation
-- Data validation
-- Point-in-time leakage guard
-- Ruff static analysis
-
-
-## Rule-Based Fraud Baseline
-
-Built the project's first deliberately simple fraud detector using point-in-time features
-
-### v1 Rules
-
-A transaction is flagged when:
-
-- its amount is more than 5x the customer's prior average and the merchant is new, or
-- more than 3 prior transactions occurred within the previous hour.
-
-Thresholds were checked using a few sensible validation-only passes rather than exhaustive optimization. The test split remained untouched.
-
-### Validation Metrics
-
-| Metric | v1 |
-|---|---:|
-| Precision | 0.1357 |
-| Recall | 0.4137 |
-| F1 | 0.2044 |
-| Accuracy | 0.9793 |
-
-Accuracy is included to demonstrate the class-imbalance problem rather than as the primary model-selection metric.
-
-The v1 confusion matrix contains 518 true positives, 3,299 false positives, 189,950 true negatives, and 734 false negatives.
-
-### Model Versioning
-
-Model experiment tracking begins with `v1`.
-
-`metrics.csv` records:
-
-- model version
-- model type
-- features used
-- precision
-- recall
-- F1
-- experiment notes
-
-The lightweight metrics log provides a baseline against which later models can be compared.
-
-### Error Costs
-
-False positives create legitimate-customer and operational friction, while false negatives allow fraud to pass undetected.
-
-For this project, false negatives are treated as having a higher direct per-event cost, while recognizing that false positives can also become expensive at scale.
-
-This cost asymmetry will later inform decision thresholds and the allow / review / block policy.
-
-
-## Logistic Regression v2
-
-The first learned ML baseline uses logistic regression on the point-in-time behavioral features developed in Week 4.
-
-Two class-imbalance strategies were tested: balanced class weighting and random minority oversampling. Their validation probability distributions were nearly identical, so class weighting was selected because it avoids duplicating observations and substantially increasing the effective training dataset.
-
-Validation results at a 0.5 decision threshold:
-
-| Metric | v1 Rules | v2 Logistic Regression |
-|---|---:|---:|
-| Precision | 0.1357 | 0.0406 |
-| Recall | 0.4137 | 0.8786 |
-| F1 | 0.2044 | 0.0776 |
-| ROC-AUC | — | 0.9161 |
-| PR-AUC / AP | — | 0.1611 |
-
-v2 substantially improves recall at the default threshold, but precision and F1 are lower than the v1 rule baseline. The result demonstrates that model ranking quality and the final operating threshold are separate concerns.
-
-The strongest positive standardized coefficient was `amount_to_prior_avg_ratio`, while `txn_count_1h_before` also contributed positively.
-
-The next modeling lever to investigate is decision-threshold tuning.
-
-See `v2-writeup.md` for the full v2 analysis.
-
+A dedicated regression test protects this point-in-time boundary.
 
 ## Model Evolution
 
-The fraud-risk engine has progressed through three model versions. Model development and selection use the validation split; the final test split remains untouched during model selection.
+All model development and selection uses the validation split.
 
-| Version | Model | Precision | Recall | F1 | ROC-AUC | PR-AUC |
-|---|---|---:|---:|---:|---:|---:|
-| v1 | Rule Baseline | 0.1357 | 0.4137 | 0.2044 | — | — |
-| v2 | Logistic Regression | 0.0406 | 0.8786 | 0.0776 | 0.9161 | 0.1611 |
-| v3 | Gradient Boosting / XGBoost | 0.0513 | 0.9305 | 0.0972 | 0.9721 | 0.5173 |
+| Version | Model               | Precision | Recall |     F1 | ROC-AUC | PR-AUC |
+| ------- | ------------------- | --------: | -----: | -----: | ------: | -----: |
+| v1      | Rule Baseline       |    0.1357 | 0.4137 | 0.2044 |       — |      — |
+| v2      | Logistic Regression |    0.0406 | 0.8786 | 0.0776 |  0.9161 | 0.1611 |
+| v3      | XGBoost             |    0.0513 | 0.9305 | 0.0972 |  0.9721 | 0.5173 |
+| v4      | Isolation Forest    |    0.0692 | 0.2907 | 0.1118 |       — | 0.0736 |
 
-### Model Selection
+### v1 — Rule Baseline
 
-Random Forest and Gradient Boosting were compared against the v2 logistic-regression model using the same validation split.
+The initial baseline flags transactions using interpretable behavioral rules based on unusually large amounts, new merchants, and recent transaction velocity.
 
-Random Forest produced substantially higher precision and F1 at the default 0.5 threshold:
+It establishes a simple benchmark before learned models are introduced.
 
-- Precision: 0.3477
-- Recall: 0.5855
-- F1: 0.4363
-- ROC-AUC: 0.9633
-- PR-AUC: 0.4136
+### v2 — Logistic Regression
 
-Gradient Boosting produced:
+The first learned baseline uses class-weighted logistic regression with standardized behavioral features.
 
-- Precision: 0.0513
-- Recall: 0.9305
-- F1: 0.0972
-- ROC-AUC: 0.9721
-- PR-AUC: 0.5173
+It substantially increased recall over v1, while demonstrating the trade-off between fraud coverage and false positives in an imbalanced dataset.
 
-Gradient Boosting was selected as the v3 candidate because it produced the strongest validation PR-AUC and ROC-AUC and the highest recall among the compared learned models.
+### v3 — XGBoost
 
-Random Forest demonstrated a different operating trade-off, with substantially stronger precision and F1 at the default 0.5 threshold.
+Random Forest and XGBoost were compared on the same validation period.
 
-Because precision, recall, and F1 depend on the classification threshold, performance at 0.5 is treated as one operating point rather than a complete measure of model ranking quality.
+XGBoost was selected as v3 because it produced the strongest ranking performance:
 
-The final test set remains sealed during model development and selection.
+* ROC-AUC: `0.9721`
+* PR-AUC: `0.5173`
+* Recall: `0.9305`
 
-### Feature-Importance Findings
+The strongest feature was `amount_to_prior_avg_ratio`, followed by prior spending behavior and amount-deviation signals.
 
-The selected v3 model primarily relies on customer-relative amount behavior.
+### v4 — Isolation Forest
 
-The four highest-ranked features were:
+v4 introduces unsupervised anomaly detection.
 
-1. `amount_to_prior_avg_ratio` — 0.3721
-2. `prior_avg_amount` — 0.1735
-3. `amount_zscore_vs_prior` — 0.1390
-4. `seconds_since_prev_txn` — 0.0794
+Isolation Forest was trained on behavioral features **without using fraud labels**.
 
-The results strongly support the original amount-deviation hypothesis and also provide evidence for transaction velocity.
+Validation results:
 
-Merchant and category novelty contributed substantially less than initially hypothesized.
+* Precision: `0.0692`
+* Recall: `0.2907`
+* F1: `0.1118`
+* PR-AUC: `0.0736`
 
-No obvious new leakage warning was identified from the feature-importance review. Point-in-time leakage guards remain part of the project.
+v3 remains substantially stronger at ranking labelled fraud. However, v4 caught **5 fraud transactions that v3 missed**, demonstrating a small complementary anomaly signal.
+
+The intended architecture is therefore to use supervised fraud scoring as the primary signal and anomaly detection as a secondary review signal rather than treating the two approaches as interchangeable.
+
+See `docs/supervised-vs-unsupervised.md` for the detailed trade-off analysis.
+
+## Key Findings
+
+**Class imbalance makes accuracy misleading.**
+Fraud detection requires metrics such as precision, recall, F1, and especially PR-AUC rather than relying on accuracy alone.
+
+**Temporal correctness matters.**
+Historical features must stop before the transaction being scored. Including the current or future transaction would create leakage.
+
+**Customer-relative amount behavior is highly informative.**
+The strongest v3 features were dominated by amount deviation relative to prior customer behavior.
+
+**Thresholds and ranking quality are different problems.**
+Precision, recall, and F1 describe a particular operating threshold, while PR-AUC measures ranking quality across thresholds.
+
+**Anomaly is not the same as fraud.**
+Isolation Forest can identify unusual behavior without labels, but unusual legitimate activity also creates false positives.
+
+**Supervised and unsupervised models can provide different signals.**
+v4 performed substantially worse than v3 overall but still detected 5 fraud cases missed by v3.
+
+## Data & Engineering Safeguards
+
+The project includes:
+
+* chronological train/validation/test boundaries
+* split-local feature generation
+* exclusion of the current transaction from historical windows
+* schema and range validation
+* fraud-label sanity checks
+* automated leakage regression testing
+* Ruff static analysis
+* GitHub Actions CI
+
+PostgreSQL was also used to practise and validate temporal transaction analysis with SQL window functions such as `LAG`, `ROW_NUMBER`, and historical rolling windows.
+
+## Experiment Tracking
+
+`metrics.csv` tracks model iterations with:
+
+* version
+* model
+* features used
+* precision
+* recall
+* F1
+* experiment notes
+
+Current progression:
+
+```text
+v1  Rules
+ |
+ v
+v2  Logistic Regression
+ |
+ v
+v3  XGBoost
+ |
+ v
+v4  Isolation Forest
+```
+
+This keeps model changes and validation results explicit rather than relying on ad-hoc notebook comparisons.
+
+## Testing
+
+The project currently includes automated tests covering:
+
+* temporal splitting
+* schema validation
+* value and null validation
+* fraud-label sanity
+* point-in-time feature leakage
+
+Run locally with:
+
+```bash
+python -m pytest tests -q
+ruff check src tests
+```
+
+CI runs the test and lint checks automatically on pushes.
+
+## Current Architecture
+
+```text
+Transactions
+     |
+     v
+Validation
+     |
+     v
+Temporal Split
+     |
+     v
+Behavioral Features
+     |
+     +---------------------+
+     |                     |
+     v                     v
+XGBoost Risk Score   Isolation Forest
+     |               Anomaly Signal
+     +----------+----------+
+                |
+                v
+       Future Decision Layer
+       Allow / Review / Block
+```
